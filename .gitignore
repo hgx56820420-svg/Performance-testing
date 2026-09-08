@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+env/
+.env
+results/*_stats.csv
+results/*_stats_history.csv
+results/*_failures.csv
+results/*_exceptions.csv
+*.log
+

@@ -1,0 +1,61 @@
+{
+  "summary": {
+    "total_requests": 3,
+    "total_failures": 0,
+    "error_rate_percent": 0.0,
+    "peak_rps": 0.5,
+    "avg_rps": 0.5,
+    "sla": {
+      "p95_ms_lt": 500,
+      "error_rate_percent_lt": 1
+    }
+  },
+  "endpoints": [
+    {
+      "name": "GET /category/querySubCategories (anonymous)",
+      "requests": 3,
+      "failures": 0,
+      "error_rate_percent": 0.0,
+      "median_ms": 19.0,
+      "p95_ms": 240.0,
+      "p99_ms": 240.0,
+      "avg_ms": 90.45824133325671,
+      "rps": 0.38455736642467064
+    }
+  ],
+  "worst_latency": [
+    {
+      "name": "GET /category/querySubCategories (anonymous)",
+      "requests": 3,
+      "failures": 0,
+      "error_rate_percent": 0.0,
+      "median_ms": 19.0,
+      "p95_ms": 240.0,
+      "p99_ms": 240.0,
+      "avg_ms": 90.45824133325671,
+      "rps": 0.38455736642467064
+    }
+  ],
+  "worst_errors": [
+    {
+      "name": "GET /category/querySubCategories (anonymous)",
+      "requests": 3,
+      "failures": 0,
+      "error_rate_percent": 0.0,
+      "median_ms": 19.0,
+      "p95_ms": 240.0,
+      "p99_ms": 240.0,
+      "avg_ms": 90.45824133325671,
+      "rps": 0.38455736642467064
+    }
+  ],
+  "hypotheses": [
+    "GET /category/querySubCategories (anonymous) 是当前最慢接口，先用 trace 拆分应用与依赖耗时。"
+  ],
+  "next_tests": [
+    "固定用户数做 10 分钟稳定性测试，排除冷启动影响。",
+    "单独压测搜索接口并切换 q=slow，验证数据库慢查询假设。",
+    "提高用户数做阶梯/拐点测试，记录最大稳定吞吐量。",
+    "结合 Prometheus 依赖延迟与应用 P95 做同时间窗口关联。"
+  ]
+}

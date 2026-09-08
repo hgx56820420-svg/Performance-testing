@@ -1,0 +1,58 @@
+services:
+  service:
+    build:
+      context: ./service
+    command: uvicorn app:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  locust:
+    image: locustio/locust:2.32.6
+    depends_on:
+      service:
+        condition: service_healthy
+    volumes:
+      - ./locust:/mnt/locust
+      - ./results:/mnt/results
+    command: -f /mnt/locust/locustfile.py --host http://service:8000
+    ports:
+      - "8089:8089"
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    depends_on:
+      service:
+        condition: service_healthy
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/mall-overview.json
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+
+  analyzer:
+    build:
+      context: .
+      dockerfile: Dockerfile.analyzer
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+    volumes:
+      - ./results:/results

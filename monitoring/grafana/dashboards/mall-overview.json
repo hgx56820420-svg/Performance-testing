@@ -1,0 +1,15 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "panels": [
+    {"type":"timeseries","title":"Request rate","gridPos":{"h":8,"w":12,"x":0,"y":0},"targets":[{"expr":"sum(rate(http_requests_total[1m])) by (route)","legendFormat":"{{route}}"}]},
+    {"type":"timeseries","title":"P95 latency","gridPos":{"h":8,"w":12,"x":12,"y":0},"targets":[{"expr":"histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[1m])) by (le, route))","legendFormat":"{{route}}"}]},
+    {"type":"timeseries","title":"Error rate","gridPos":{"h":8,"w":12,"x":0,"y":8},"targets":[{"expr":"sum(rate(http_requests_total{status=~\"4..|5..\"}[1m])) / sum(rate(http_requests_total[1m]))","legendFormat":"error ratio"}]},
+    {"type":"timeseries","title":"Dependency latency","gridPos":{"h":8,"w":12,"x":12,"y":8},"targets":[{"expr":"histogram_quantile(0.95, sum(rate(dependency_duration_seconds_bucket[1m])) by (le, dependency))","legendFormat":"{{dependency}}"}]}
+  ],
+  "schemaVersion": 39,
+  "title": "Game Mall Performance Overview",
+  "time": {"from":"now-30m","to":"now"},
+  "timezone": "browser",
+  "version": 1
+}
