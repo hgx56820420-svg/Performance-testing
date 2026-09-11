@@ -18,7 +18,8 @@
 前置条件：Docker Desktop 已启动。
 
 ```powershell
-cd C:\Users\新\Documents\Codex\2026-09-08\gen\outputs\performance-test-lab
+git clone https://github.com/hgx56820420-svg/Performance-testing.git
+cd Performance-testing
 docker compose up --build -d
 ```
 
@@ -33,7 +34,9 @@ docker compose up --build -d
 
 ## 1.1 使用你的 YY QA 测试地址（只读起步）
 
-已针对 `https://gamesrv-qa.yy.com/proxy/mall/` 增加只读场景：它压商城 HTML 入口，并压前端公开调用的 `test-gamemarket.yy.com/category/querySubCategories`。Locust 不执行浏览器 JavaScript，因此这个场景不是完整 E2E；它用于先确认 QA 环境、TLS、网关和匿名 API 的容量。
+已针对 `https://gamesrv-qa.yy.com/proxy/mall/` 增加只读场景：它压商城 HTML 入口，并压前端 bundle 中实际确认可匿名访问的 `test-gamemarket.yy.com` 分类接口。Locust 不执行浏览器 JavaScript，因此这个场景不是完整 E2E；它用于先确认 QA 环境、TLS、网关和匿名 API 的受控基线。
+
+当前已确认可匿名读取的接口：`/category/querySubCategories`、`/category/queryCategories`、`/category/queryShowCategories`、`/category/queryShowSubCategories`。`/goods/v2/search`、`/goods/v2/detail`、`/mall-home/value-account` 等接口返回 HTTP 200 但业务 `code=100004` 或缺少必填参数，未获得接口契约和专用压测凭证前不加入负载场景。
 
 启动本地监控后运行 1 分钟、最多 5 个用户：
 
@@ -84,7 +87,7 @@ docker compose run --rm analyzer `
   --output /results/baseline_report.md
 ```
 
-报告不依赖模型即可生成。如果设置 `OPENAI_API_KEY`，再加 `--ai` 会基于确定性统计结果生成 AI 辅助分析：
+报告不依赖模型即可生成。默认要求至少 100 个请求才给出 PASS/FAIL；样本不足会标记 `INCONCLUSIVE`。可用参数显式调整阈值和最小样本量。如果设置 `OPENAI_API_KEY`，再加 `--ai` 会基于确定性统计结果生成 AI 辅助分析：
 
 ```powershell
 $env:OPENAI_API_KEY = "你的 key"
@@ -93,8 +96,40 @@ docker compose run --rm `
   analyzer python /app/scripts/analyze_results.py `
   --stats /results/baseline_stats.csv `
   --history /results/baseline_stats_history.csv `
-  --output /results/baseline_report.md --ai
+  --output /results/baseline_report.md --min-requests 100 --p95-ms 500 `
+  --error-rate-percent 1 --ai
 ```
+
+## 1.3 稳定性与异常检测 Agent
+
+项目还提供一个小型证据约束 Agent：先用规则统计 Locust 结果、日志、Prometheus 指标，并静态检查系统代码和 API 测试脚本；只有显式传入 `--ai` 且设置 `OPENAI_API_KEY` 时，才让模型基于脱敏后的证据输出观察、待验证假设、缺失证据和下一步实验。模型不能替代指标，也不会直接把假设当作根因。
+
+本地运行示例：
+
+```powershell
+python scripts/stability_agent.py `
+  --stats results/baseline_stats.csv `
+  --history results/baseline_stats_history.csv `
+  --metrics http://localhost:9090/metrics `
+  --code service/app.py `
+  --api-script locust/locustfile.py `
+  --output results/stability_agent.json
+```
+
+使用 analyzer 容器时：
+
+```powershell
+docker compose run --rm analyzer `
+  python /app/scripts/stability_agent.py `
+  --stats /results/baseline_stats.csv `
+  --history /results/baseline_stats_history.csv `
+  --metrics http://prometheus:9090/metrics `
+  --code /app/service/app.py `
+  --api-script /app/locust/locustfile.py `
+  --output /results/stability_agent.json
+```
+
+输入日志和脚本会在进入报告或模型提示词前脱敏常见的 token、密码、Cookie 和 Authorization 值。输出 JSON 中将 `findings`（确定性证据）与 `ai_analysis`（可选解释）分开，便于复核。
 
 ## 2. 目录说明
 
@@ -106,7 +141,8 @@ performance-test-lab/
 ├─ locust/
 │  └─ locustfile.py          # 浏览、搜索、详情、购物车、下单五类业务流量
 ├─ scripts/
-│  └─ analyze_results.py     # P50/P95/P99、错误率、吞吐量和瓶颈假设
+│  ├─ analyze_results.py     # P50/P95/P99、错误率、吞吐量和瓶颈假设
+│  └─ stability_agent.py     # 日志/指标/代码/接口脚本的证据约束分析 Agent
 ├─ monitoring/
 │  ├─ prometheus.yml
 │  └─ grafana/               # 自动配置数据源和仪表盘
@@ -133,3 +169,4 @@ performance-test-lab/
 - 这个服务是教学用 mock，不代表真实生产架构；压测前必须确认目标环境、数据脱敏、流量上限和回滚方案。
 - AI 只能解释已经采集到的证据，不能替代指标、日志、trace 和代码定位。
 - “通过”应由事先约定的 SLA/SLO 判定，例如核心接口 P95 < 500 ms、错误率 < 1%，而不是凭感觉。
+- 只读 smoke、基线、负载、压力、峰值、稳定性和容量测试是不同证据等级；请求数很少的 smoke 只能证明脚本与连通性。

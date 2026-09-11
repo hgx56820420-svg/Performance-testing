@@ -1,4 +1,3 @@
-import os
 import random
 import uuid
 
@@ -11,6 +10,7 @@ class MallUser(HttpUser):
     def on_start(self):
         self.user_id = str(uuid.uuid4())
         self.product_id = random.randint(1, 100)
+        self.cart_id = None
 
     @task(35)
     def browse_products(self):
@@ -22,6 +22,9 @@ class MallUser(HttpUser):
         ) as response:
             if response.status_code != 200:
                 response.failure(f"catalog status={response.status_code}")
+                return
+            if not isinstance(response.json().get("items"), list):
+                response.failure("catalog items is not a list")
 
     @task(20)
     def search_products(self):
@@ -35,6 +38,9 @@ class MallUser(HttpUser):
         ) as response:
             if response.status_code != 200:
                 response.failure(f"search status={response.status_code}")
+                return
+            if not isinstance(response.json().get("items"), list):
+                response.failure("search items is not a list")
 
     @task(25)
     def view_detail(self):
@@ -44,7 +50,9 @@ class MallUser(HttpUser):
             headers={"X-User-Id": self.user_id},
             catch_response=True,
         ) as response:
-            if response.status_code not in (200, 404):
+            # The generated product id is valid. A 404 is a test failure here;
+            # negative-resource coverage belongs in a separate scenario.
+            if response.status_code != 200:
                 response.failure(f"detail status={response.status_code}")
 
     @task(12)
@@ -58,15 +66,28 @@ class MallUser(HttpUser):
         ) as response:
             if response.status_code != 200:
                 response.failure(f"cart status={response.status_code}")
+                return
+            payload = response.json()
+            self.cart_id = payload.get("cart_id")
+            if not self.cart_id:
+                response.failure("cart_id missing from cart response")
 
     @task(8)
     def checkout(self):
+        if not self.cart_id:
+            # Do not send a synthetic order. This keeps the order metric tied to
+            # a real cart created by this virtual user.
+            return
         with self.client.post(
             "/api/orders",
-            json={"cart_id": f"cart-{self.product_id}"},
+            json={"cart_id": self.cart_id},
             name="POST /api/orders",
             headers={"X-User-Id": self.user_id},
             catch_response=True,
         ) as response:
-            if response.status_code not in (200, 502):
+            # A payment/downstream 502 is a business failure for this flow.
+            if response.status_code != 200:
                 response.failure(f"order status={response.status_code}")
+                return
+            if response.json().get("status") != "paid":
+                response.failure("order status is not paid")

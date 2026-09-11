@@ -1,5 +1,4 @@
 import asyncio
-import os
 import random
 import time
 from typing import Annotated
@@ -7,7 +6,6 @@ from typing import Annotated
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
-
 
 app = FastAPI(title="Game Mall Performance Lab", version="1.0.0")
 

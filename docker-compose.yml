@@ -56,3 +56,5 @@ services:
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
     volumes:
       - ./results:/results
+      - ./service:/app/service:ro
+      - ./locust:/app/locust:ro

@@ -13,6 +13,23 @@
 | `GET /mall-home/value-account` 脱离浏览器上下文 | HTTP 200，但业务 `code=100004` |
 | `GET /goods/v2/detail` 无参数 | HTTP 200，但业务 `code=-2` |
 
+## 2026-09-11 只读接口勘察
+
+从页面加载的 `index.e0304d4b.js` 中提取测试 API 主机和接口定义后，对每个候选 GET 接口只发送 1 次请求；没有登录、Cookie、ticket、签名或写操作。结果如下：
+
+| 接口 | HTTP | 业务 code | 单次耗时 | 响应大小 | 结论 |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `/category/querySubCategories` | 200 | 0 | 516 ms | 837 B | 可纳入只读场景 |
+| `/category/queryCategories` | 200 | 0 | 32 ms | 12,831 B | 可纳入只读场景 |
+| `/category/queryShowCategories` | 200 | 0 | 35 ms | 5,330 B | 可纳入只读场景 |
+| `/category/queryShowSubCategories` | 200 | 0 | 29 ms | 81 B | 可纳入只读场景 |
+| `/mall-home/hot-games` | 200 | 100004 | 40 ms | 42 B | 当前匿名上下文被业务鉴权拒绝 |
+| `/search/suggest` | 200 | 100004 | 45 ms | 42 B | 当前匿名上下文被业务鉴权拒绝 |
+| `/goods/v2/search` | 200 | 100004 | 32 ms | 42 B | 当前匿名上下文被业务鉴权拒绝 |
+| `/mall-home/value-account` | 200 | 100004 | 42 ms | 42 B | 当前匿名上下文被业务鉴权拒绝 |
+
+这些请求是连通性/契约勘察，不是容量结论。耗时、并发和阶梯负载必须在获得压测窗口、上限和停止条件后进行。
+
 ## 为什么不能直接压完整商城链路
 
 前端 bundle 显示业务 API 的测试域名是 `https://test-gamemarket.yy.com`，并启用 Cookie/credentials；部分接口还需要 ticket 或签名。直接从 Locust 发请求时，浏览器上下文中的 Cookie、请求参数、签名和前置接口状态都不存在，所以网关会返回业务错误。这个错误本身也是性能测试中要记录的“业务失败”，不能只看 HTTP 200。
